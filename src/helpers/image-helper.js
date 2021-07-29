@@ -11,15 +11,21 @@ export const cropPicture = async (imageData, maskDimension) => {
     const {uri, width, height} = imageData;
     const cropWidth = maskDimension * (width / DEVICE_WIDTH);
     const cropHeight = maskDimension * (height / DEVICE_HEIGHT);
+    // console.log(cropWidth)
+    // console.log(cropHeight)
     const actions = [
-      {
-        crop: {
-          originX: width / 2 - cropWidth / 2,
-          originY: height / 2 - cropHeight / 2,
-          width: cropWidth,
-          height: cropHeight,
-        },
-      },
+      // {
+      //   crop: {
+      //     // originX: width / 2 - cropWidth / 2,
+      //     // originY: height / 2 - cropHeight / 2,
+      //     // width: cropWidth,
+      //     // height: cropHeight,
+      //     originX: width / 2 - cropWidth / 2,
+      //     originY: height / 2 - cropHeight / 2,
+      //     width: width,
+      //     height: height,
+      //   },
+      // },
       {
         resize: {
           width: BITMAP_DIMENSION,

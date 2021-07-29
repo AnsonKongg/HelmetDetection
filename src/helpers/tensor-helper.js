@@ -1,12 +1,19 @@
 import * as tf from '@tensorflow/tfjs';
+import { loadLayersModel } from '@tensorflow/tfjs';
+import {loadGraphModel} from '@tensorflow/tfjs-converter';
 import '@tensorflow/tfjs-react-native';
-import {bundleResourceIO, decodeJpeg} from '@tensorflow/tfjs-react-native';
+import {
+  bundleResourceIO,
+  decodeJpeg,
+  asyncStorageIO,
+} from '@tensorflow/tfjs-react-native';
 
 import {Base64Binary} from '../utils/utils';
 const BITMAP_DIMENSION = 224;
 
 const modelJson = require('../model/model.json');
-const modelWeights = require('../model/weights.bin');
+// const modelWeights = require('../model/weights.bin');
+const modelWeights = require('../model/group1-shard.bin');
 
 // 0: channel from JPEG-encoded image
 // 1: gray scale
@@ -15,10 +22,23 @@ const TENSORFLOW_CHANNEL = 3;
 
 export const getModel = async () => {
   try {
-    // wait until tensorflow is ready
-    await tf.ready();
     // load the trained model
-    return await tf.loadLayersModel(bundleResourceIO(modelJson, modelWeights));
+    const url = {
+      model: modelJson,
+    };
+    // const net = await model.save('localstorage://my-model-1');
+    // const net = await tf.loadGraphModel(
+    //   bundleResourceIO(modelJson, modelWeights),
+    // );
+
+    // const net = await tf.loadGraphModel(
+    //   'https://rolltechhelmet.s3.us-east.cloud-object-storage.appdomain.cloud/model.json',
+    // );
+    const net = await tf.loadGraphModel(
+      'https://helmetrolltfod.s3.us-east.cloud-object-storage.appdomain.cloud/model.json',
+    );
+    console.log('Success getModel!');
+    return net;
   } catch (error) {
     console.log('Could not load model', error);
   }
@@ -44,10 +64,22 @@ export const convertBase64ToTensor = async (base64) => {
 export const startPrediction = async (model, tensor) => {
   try {
     // predict against the model
-    const output = await model.predict(tensor);
+    const output = await model.executeAsync(tensor);
+    const boxes = await output[6].array();//6
+    // console.log(boxes)
+    const classes = await output[2].array();//3
+    // console.log(classes)
+    const scores = await output[5].array(); //5
+    // console.log(scores)
+    const obj = {
+      boxes: boxes[0],
+      classes: classes[0],
+      scores: scores[0],
+    };
+
     // return typed array
-    return output.dataSync();
+    return obj;
   } catch (error) {
-    console.log('Error predicting from tesor image', error);
+    console.log('Error predicting from tensor image', error);
   }
 };
