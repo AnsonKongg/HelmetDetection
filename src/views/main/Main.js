@@ -3,12 +3,11 @@ import {
   View,
   StyleSheet,
   Dimensions,
-  Pressable,
-  Modal,
+  TouchableOpacity,
   Text,
   ActivityIndicator,
+  ImageEditor
 } from 'react-native';
-
 import {
   getModel,
   convertBase64ToTensor,
@@ -16,81 +15,70 @@ import {
   convertImageToTensor
 } from '../../helpers/tensor-helper';
 import { cropPicture } from '../../helpers/image-helper';
-import { Camera } from 'expo-camera';
+// import { Camera } from 'expo-camera';
+import { RNCamera, FaceDetector } from 'react-native-camera';
+import RNFS from 'react-native-fs';
 import * as tf from '@tensorflow/tfjs';
+import { cameraWithTensors } from '@tensorflow/tfjs-react-native';
 
-// const RESULT_MAPPING = ['Triangle', 'Circle', 'Square'];
+// const TensorCamera = cameraWithTensors(Camera);
 const RESULT_MAPPING = ['Helmet', 'NoHelmet'];
+const BITMAP_DIMENSION = 224;
 
 const Main = () => {
   const cameraRef = useRef();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [presentedShape, setPresentedShape] = useState('Waiting');
+  const [presentedShape, setPresentedShape] = useState('Fetching Modal');
   const [model, setModel] = useState(null);
-  const [isGot, setIsGot] = useState(false);
 
   useEffect(() => {
-    // var interval = null;
-    if (!isGot) {
-      getModelFirst();
-    } 
-    else {
-      if (!isProcessing) {
-        const interval = setInterval(() => {
-          handleImageCapture();
-        }, 1000);
-        return () => clearInterval(interval);
-      }
-    }
-  }, [isGot, isProcessing, presentedShape]);
+    getModelFirst();
+  }, []);
 
   const getModelFirst = async () => {
+    // Wait for tensor flow start
     await tf.ready();
     console.log('Start getModel!');
-    var result = await getModel();
-    console.log(result);
+    // Start fetching Model
+    const result = await getModel();
     setModel(result);
-    setIsGot(true);
+    setPresentedShape('Take Photo now!');
   };
-
-  const handleImageCapture = async () => {
-    console.log(isProcessing);
-    if (!isProcessing) {
-      console.log('Start running!');
+  // Take Picture
+  const takePicture = async () => {
+    if (!!model && !isProcessing) {
+      console.log('Start running!')
       setIsProcessing(true);
-      const imageData = await cameraRef.current.takePictureAsync({
+      // Picture Options
+      const options = { 
+        // quality: 0.5, 
         base64: true,
-      });
-      // console.log(imageData)
-      processImagePrediction(imageData);
+      };
+      const data = await cameraRef.current.takePictureAsync(options);
+      processImagePrediction(data);
     }
   };
-
   const processImagePrediction = async (base64Image) => {
-    console.log('Start Prediction!');
-    const croppedData = await cropPicture(base64Image, 300);
-    // console.log(croppedData);
-    console.log('Finish cropPicture!');
+    // Resize picture
+    const croppedData = await cropPicture(base64Image);   //?? If react native can resize picture to 224X224, this step can be remove
+    // Convert picture to tensor
     const tensor = await convertBase64ToTensor(croppedData.base64);
-    // console.log(tensor);
-    console.log('Finish generate tensor!');
+    // Use model to predict tensor
     const prediction = await startPrediction(model, tensor);
-    console.log('Finish generate prediction!');
-    // console.log(prediction);
-
-    let highestPrediction = mode(prediction);
-    console.log('Finish generate highestPrediction!');
-    console.log(highestPrediction);
-
+    // Base on model prediction result, get highest chance prediction
+    let highestPrediction = getModelResult(prediction);
+    // Find result in RESULT_MAPPING array
     if (highestPrediction > 0) {
       setPresentedShape(RESULT_MAPPING[highestPrediction - 1]);
     } else {
       setPresentedShape('Cannot Found');
     }
     setIsProcessing(false);
+    // Remove image from cache
+    // RNFS.unlink(base64Image.uri);
   };
-
-  const mode = (obj) => {
+  const getModelResult = (obj) => {
+    // alert(JSON.stringify(obj))
     const { boxes, classes, scores } = obj;
     for (let i = 0; i <= boxes.length; i++) {
       if (boxes[i] && classes[i] && scores[i] >= 0.8) {
@@ -102,31 +90,44 @@ const Main = () => {
 
   return (
     <View style={styles.container}>
-      <Modal visible={true} transparent={true} animationType="slide">
-        <View style={styles.modal}>
-          <View style={styles.modalContent}>
-            {isProcessing ? <ActivityIndicator /> : <Text style={{ color: "white" }}>{presentedShape}</Text>}
-            {/* <Pressable
-              style={styles.dismissButton}
-              onPress={() => {
-                setPresentedShape('');
-                setIsProcessing(false);
-              }}>
-              <Text>Dismiss</Text>
-            </Pressable> */}
-          </View>
-        </View>
-      </Modal>
-
-      <Camera
+      {/* <Camera           //Expo Camera
         ref={cameraRef}
         style={styles.camera}
         type={Camera.Constants.Type.front}
         autoFocus={true}
-        whiteBalance={Camera.Constants.WhiteBalance.auto}></Camera>
-      <Pressable
-        // onPress={() => handleImageCapture()}
-        style={styles.captureButton}></Pressable>
+        whiteBalance={Camera.Constants.WhiteBalance.auto}></Camera> */}
+
+      <RNCamera           //React Native Camera
+        ref={cameraRef}
+        style={styles.camera}
+        type={RNCamera.Constants.Type.front}
+        // flashMode={RNCamera.Constants.FlashMode.on}
+        androidCameraPermissionOptions={{
+          title: 'Permission to use camera',
+          message: 'We need your permission to use your camera',
+          buttonPositive: 'Ok',
+          buttonNegative: 'Cancel',
+        }}
+        androidRecordAudioPermissionOptions={{
+          title: 'Permission to use audio recording',
+          message: 'We need your permission to use your audio',
+          buttonPositive: 'Ok',
+          buttonNegative: 'Cancel',
+        }}
+        onGoogleVisionBarcodesDetected={({ barcodes }) => {
+          console.log(barcodes);
+        }}
+      />
+      <View style={styles.infoWrapper}>
+        <TouchableOpacity onPress={takePicture} style={styles.infoContainer}>
+          {isProcessing ? <ActivityIndicator /> : <Text style={styles.infoText}>{presentedShape}</Text>}
+        </TouchableOpacity>
+      </View>
+      <View style={styles.captureContainer}>
+        <TouchableOpacity onPress={takePicture} style={styles.capture}>
+          <Text style={{ fontSize: 14 }}> SNAP </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -141,6 +142,25 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  captureContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    paddingBottom: 50,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  capture: {
+    flex: 0,
+    backgroundColor: '#fff',
+    borderRadius: 5,
+    padding: 15,
+    paddingHorizontal: 20,
+    alignSelf: 'center',
+    margin: 20,
+    width: 90,
+    height: 55,
+  },
   captureButton: {
     position: 'absolute',
     left: Dimensions.get('screen').width / 2 - 50,
@@ -151,21 +171,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 50,
   },
-  modal: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    paddingTop: 50,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  modalContent: {
-    alignItems: 'center',
+  infoWrapper: {
+    flex: 0,
+    flexDirection: 'row',
     justifyContent: 'center',
-    width: 130,
-    height: 80,
-    borderRadius: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0)',
+    position: 'absolute',
+    top: 50,
+    left: 16,
+    right: 16,
+  },
+  infoText: {
+    fontSize: 14,
+    color: 'white',
+  },
+  infoContainer: {
+    flex: 0,
     backgroundColor: 'gray',
+    borderRadius: 5,
+    padding: 15,
+    paddingHorizontal: 20,
+    alignSelf: 'center',
+    margin: 20,
   },
   dismissButton: {
     width: 150,

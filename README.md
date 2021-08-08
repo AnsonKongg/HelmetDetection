@@ -68,6 +68,11 @@ yarn debug-build
 - Archive app
 - Sign and upload to TestFlight
 
+### Fix installation bug
+1. remove EXPermissions/EXCameraPermissionRequester.h  and EXPermissions/EXCameraPermissionRequester.m
+2. add "@property (nonatomic, strong) UIWindow *window;" into UMAppDelegateWrapper.h
+3. replace "return *(((JSGlobalContextRef *)(_bridge.runtime)) + 1);" to "return _bridge.jsContextRef;"
+
 ## Production build
 
 ###Android:

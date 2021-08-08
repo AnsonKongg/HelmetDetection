@@ -1,13 +1,10 @@
 import * as tf from '@tensorflow/tfjs';
-import { loadLayersModel } from '@tensorflow/tfjs';
-import {loadGraphModel} from '@tensorflow/tfjs-converter';
 import '@tensorflow/tfjs-react-native';
 import {
   bundleResourceIO,
   decodeJpeg,
   asyncStorageIO,
 } from '@tensorflow/tfjs-react-native';
-
 import {Base64Binary} from '../utils/utils';
 const BITMAP_DIMENSION = 224;
 
@@ -22,18 +19,13 @@ const TENSORFLOW_CHANNEL = 3;
 
 export const getModel = async () => {
   try {
-    // load the trained model
-    const url = {
-      model: modelJson,
-    };
+    // load the trained model from local files
     // const net = await model.save('localstorage://my-model-1');
     // const net = await tf.loadGraphModel(
     //   bundleResourceIO(modelJson, modelWeights),
     // );
 
-    // const net = await tf.loadGraphModel(
-    //   'https://rolltechhelmet.s3.us-east.cloud-object-storage.appdomain.cloud/model.json',
-    // );
+    // load the trained model by URL
     const net = await tf.loadGraphModel(
       'https://helmetrolltfod.s3.us-east.cloud-object-storage.appdomain.cloud/model.json',
     );
@@ -57,26 +49,26 @@ export const convertBase64ToTensor = async (base64) => {
       TENSORFLOW_CHANNEL,
     ]);
   } catch (error) {
-    console.log('Could not convert base64 string to tesor', error);
+    console.log('Could not convert base64 string to ten sor', error);
   }
 };
 
 export const startPrediction = async (model, tensor) => {
   try {
     // predict against the model
-    const output = await model.executeAsync(tensor);
-    const boxes = await output[6].array();//6
-    // console.log(boxes)
-    const classes = await output[2].array();//3
-    // console.log(classes)
-    const scores = await output[5].array(); //5
-    // console.log(scores)
+    const output = await model.executeAsync(tensor);  //?? Problem: cannot work in the normal app
+    // prediction box of picture
+    const boxes = await output[6].array();
+    // prediction catagories
+    const classes = await output[2].array();
+    // prediction scores
+    const scores = await output[5].array();
+
     const obj = {
       boxes: boxes[0],
       classes: classes[0],
       scores: scores[0],
     };
-
     // return typed array
     return obj;
   } catch (error) {
