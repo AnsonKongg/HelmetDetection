@@ -58,16 +58,19 @@ export const startPrediction = async (model, tensor) => {
     // predict against the model
     const output = await model.executeAsync(tensor);  //?? Problem: cannot work in the normal app
     // prediction box of picture
-    const boxes = await output[6].array();
+    // const boxes = await output[6].array();
+    const boxes = output[6].dataSync();
     // prediction catagories
-    const classes = await output[2].array();
+    // const classes = await output[2].array();
+    const classes = output[2].dataSync();
     // prediction scores
-    const scores = await output[5].array();
+    // const scores = await output[5].array();
+    const scores = output[5].dataSync();
 
     const obj = {
-      boxes: boxes[0],
-      classes: classes[0],
-      scores: scores[0],
+      boxes: boxes,
+      classes: classes,
+      scores: scores,
     };
     // return typed array
     return obj;
